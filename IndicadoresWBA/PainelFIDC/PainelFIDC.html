@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="rpassosfranco">
+	<title></title>
+	<!--Limpa css -->
+	<link rel="stylesheet" href="/BibliotecaWBABI/PainelFIDC/js/bootstrap-3.2.0-dist/css/normalize.css">
+	<!-- jquery -->
+	<script src="/BibliotecaWBABI/PainelFIDC/js/bootstrap-3.2.0-dist/js/jquery.min.js"></script>
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="/BibliotecaWBABI/PainelFIDC/js/bootstrap-3.2.0-dist/css/bootstrap.min.css">
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="/BibliotecaWBABI/PainelFIDC/js/bootstrap-3.2.0-dist/js/bootstrap.min.js"></script>
+	<!-- Latest compiled Highcharts -->
+	<script src="/BibliotecaWBABI/PainelFIDC/js/betaHightChats/highcharts.js"></script>
+	<script src="/BibliotecaWBABI/PainelFIDC/js/betaHightChats/exporting.js"></script>
+	<!--Funções Auxiliares-->
+	<script type="text/javascript" src="/BibliotecaWBABI/js/FuncoesBasicas.js"></script>
+	<style>
+	.click_grafico1
+	{ 
+	 width:20px;
+	}
+	.click_grafico2
+	{
+	 width:20px;
+	}
+	.container
+	{
+	width:100%;
+	}
+	h2{
+		font-family:"Trebuchet MS", Helvetica, sans-serif;
+		color:#FFF;
+		background-color:#75B9E6;
+		margin-bottom:5px;
+		padding:15px;
+	}
+	Table{
+		text-align:center;
+	}
+	th{
+		text-align:center;
+	}
+	</style>
+  </head>
+<body>
+<div class="container">
+  <div class="row">
+	<div class="col-lg-12"> 
+			<h2>PAINEL FIDC</h2>
+			<!-- Nav tabs -->
+			<ul class="nav nav-tabs" role="tablist" id="myTab" style="padding-top:10px">
+			  <li class="active" id="tooltip_PL"><a href="#PL1" role="tab" data-toggle="tab">PL</a></li>
+			  <li id="tooltip_Liquidez" ><a href="#Liquidez" role="tab" data-toggle="tab">Liquidez</a></li>
+			  <li id="tooltip_Recompra"><a href="#Regressado1" role="tab" data-toggle="tab">Recompra</a></li>
+			  <li id="tooltip_Atraso"><a href="#Atraso" role="tab" data-toggle="tab">Vencidos</a></li>
+			  <li id="tooltip_PDD"><a href="#PDD" role="tab" data-toggle="tab">PDD</a></li>
+			  <li id="tooltip_Cedente"><a href="#Cedente" role="tab" data-toggle="tab">Cedente</a></li>
+			  <li id="tooltip_Sacado"><a href="#Sacado" role="tab" data-toggle="tab">Sacado</a></li>
+			  <li id="tooltip_Ticket"><a href="#Ticket" role="tab" data-toggle="tab">Ticket/Prazo Medio </a></li>
+			</ul>
+			<!-- Tab panes -->
+			<div class="tab-content">
+			  <div class="tab-pane active" id="PL1">
+				<div id="PL"></div>
+				<div id='container_graficoPL' style='min-width:310px; height:400px; margin:0 auto'></div>
+			  </div>
+			  <div class="tab-pane" 	   id="Liquidez">conteudo  2</div>
+			  <div class="tab-pane"        id="Regressado1">
+				<div class="row">
+				  <div class="col-lg-6" id="Regressado" width='100%'></div>
+				  <div class="col-lg-6" id="Grafico_Barra_5_Sacados" width='100%'></div>
+				</div>
+				<div class="row">
+				  <div class="col-lg-6" id='container_graficoRegressado' width='100%'></div>
+				  <div class="col-lg-6" id="Grafico_Quantidade_Titulos" width='100%'></div>
+				</div>
+			  </div>
+			  <div class="tab-pane" 	   id="Atraso">conteudo 4</div>
+			  <div class="tab-pane"	       id="PDD">conteudo 5</div>
+			  <div class="tab-pane" 	   id="Cedente">conteudo  6</div>
+			  <div class="tab-pane"        id="Sacado">conteudo 7</div>
+			  <div class="tab-pane"        id="Ticket">conteudo 8</div>
+			</div>
+		</div>
+	</div>
+ </div>
+</body>
+</html>
+
+<script>
+	//Caminho XACTION
+	var caminhoXaction = "/pentaho/api/repos/:_WBA-FI:JSP_DASH:Dados.xaction/generatedContent?&";
+	var caminhoXactionJSP ="/pentaho/getDataWBA?";
+	//Objetos compartilhados
+	var HeadTabela = "<div class='table-responsive'><table class='table table-bordered table-hover table-condensed table-striped' style='font-size:12px'><thead><tr class='info'>";
+	//Area dos Graficos
+	var area_grafico = "<div style='height:100%;width:100%;'><spam class='fechar_garfico'><div align='right'><img src='/BibliotecaWBABI/PainelFIDC/img/botao-fechar.png'/></div></spam><br><br><div id='container_grafico' style='min-width: 310px; height: 400px; margin: 0 auto'></div></div>";
+	var linhaClicada = '';
+	
+	function ToolTip(local,Tooltip)
+	{
+		$(local).tooltip({
+			placement: "top",
+			title: Tooltip
+		});
+	}
+	
+	//Inicio do projeto
+	$(function()  {
+	
+    //inicia conteudo
+	limpaTela();
+	
+	//Configura Tooltip
+	ToolTip('#tooltip_PL','PL - Patrimônio Líquido é o total do ativo da carteira do fundo');
+	ToolTip('#tooltip_Liquidez','Liquidez é o resultado da divisão do que vencia no mês pelo que efetivamente foi pago.');
+	ToolTip('#tooltip_Recompra','Recompra representa o percentual que foi liquidado pelo cedente.');
+	ToolTip('#tooltip_Atraso','Atraso representa o total de títulos do fundo vencidos na data.');
+	ToolTip('#tooltip_PDD','PDD é o percentual proposto pelo fundo para fazer frente a possíveis inadimplências.');
+	ToolTip('#tooltip_Cedente','Concentração do cedente é o percentual correspondente ao somatório do risco dos 10 maiores cedentes.');
+	ToolTip('#tooltip_Sacado','Concentração do sacado é o percentual correspondente ao somatório do risco dos 10 maiores sacados.');
+	ToolTip('#tooltip_Ticket','Ticket médio é o valor médio dos títulos a vencer que compõem a carteira do fundo.');
+	ToolTip('#tooltip_Prazo','Prazo médio da carteira - é o prazo médio dos títulos a vencer que compõem a carteira do fundo.');
+	
+	//Carrega todos os conteudos nas tabs
+	function limpaTela()
+	{   console.clear();
+		popula_PL();
+		popula_Liquidez();
+		popula_Atraso();
+		popula_PDD();
+		popula_Cedente();
+		popula_Sacado();
+		popula_Regressado(); //Recompra
+		popula_TicketMedio();
+		//$('#myTab li:eq(0) a').tab('show');
+	}
+	
+	//Popula PL 
+	function popula_PL()
+	{	
+		var Tabela_PL = HeadTabela+"<th>Empresa</th>";
+		var registros = "<tr>";
+		var contador  = 0;
+		var categoriasPL = new Array();
+		var valoresPL    = new Array(); 
+		
+		console.log(caminhoXaction+'getData=Patrimonio');
+		
+		$.getJSON(caminhoXaction+'getData=Patrimonio', function(data) {
+			//Colunas
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key >0 ){
+					Tabela_PL = Tabela_PL + "<th >"+val+"</th>";
+					categoriasPL[key-2] = val
+					contador = contador+1;
+					
+				}
+			});
+			
+		
+			Tabela_PL = Tabela_PL + "</tr></thead><tbody id='tabela_PL_registros'></tbody></table></div>";
+			
+			
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+				registros = registros +"<td>"+val[0]+"</td>";
+			    var i = 0;
+				for (i=1;i<=contador;i++) 
+				{
+				  registros = registros +"<td>R$ "+formatNumber(val[i+1])+"</td>";
+				  valoresPL[i-1] = parseFloat(getNum(val[i+1]));
+				}registros = registros +"</tr>"; 
+			});
+			//registros = registros +"</tr>"; 
+			
+			//Renderiza
+			$('#PL').html(Tabela_PL);
+			$('#tabela_PL_registros').html(registros);
+		
+		}).always(function() {
+			//	CriarChart_Linha2(categoriasPL,valoresPL,'empresa','container_graficoPL');
+		});	
+	}
+	
+	//Popula Liquidez
+	function popula_Liquidez()
+	{
+		var Tabela_PL = HeadTabela+"<th>Mes-Ano</th>";
+		var registros = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=Liquidez', function(data) {	
+			
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 1 ){
+					Tabela_PL = Tabela_PL + "<th>"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			
+			Tabela_PL = Tabela_PL + " </tr></thead><tbody id='tabela_Liquidez_registros'></tbody></table></div>";
+			
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+				registros = registros +"<tr class='celula_tabela' name='"+key+"' value="+val[0]+"><td>"+val[0]+"</td>";
+			    var i = 0;
+				for (i=1;i<=contador;i++) 
+				{
+				   registros = registros +"<td>"+parseFloat(val[i+1]*100).toFixed(2)+"%</td>";
+				}
+				registros = registros +"</tr>";
+				registros = registros + "<tr><td colspan='9' id='td_limpa_"+key+"'></td></tr>";
+			});
+			
+		}).always(function() {
+					$('#Liquidez').html(Tabela_PL);
+					$('#tabela_Liquidez_registros').html(registros);
+					console.log("terminou liquidez");
+		});	
+	}
+		
+	//Popula Atraso
+	function popula_Atraso()
+	{
+		var Tabela_Atraso = HeadTabela+"<th>Ano</th>";
+		var registros = "<tr>";
+		var registrosT = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=Atraso', function(data) {	
+			
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_Atraso = Tabela_Atraso + "<th >"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_Atraso = Tabela_Atraso + "</tr></thead><tbody id='tabela_Atraso_registros'></tbody></table></div>";
+			
+			var tdAux = "<td>";
+			var tdAuxFim = "</td>";
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+		     
+			 
+			if (key == 0)
+			{
+				tdAux    = "<td style='color:#000'><b>";
+				tdAuxFim = "</b></td>"; 
+			}else
+			{
+				tdAux    = "<td>";
+				tdAuxFim = "</td>"; 
+			}
+			
+			if (key != 0)
+			{
+				
+				registros = registros +tdAux+val[0]+tdAuxFim;
+				var i = 0;
+					
+				registros = registros +tdAux+" R$ "+formatNumber(parseFloat(val[1]).toFixed(2))+tdAuxFim;
+				
+				for (i=1;i<=contador-1;i++) 
+				{
+					   registros = registros +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+				}
+				
+				registros = registros +"</tr>"; 
+				
+			}else
+			{
+			
+				
+				registrosT = registrosT +tdAux+val[0]+tdAuxFim;
+				var i = 0;
+					
+				registrosT = registrosT +tdAux+" R$ "+formatNumber(parseFloat(val[1]).toFixed(2))+tdAuxFim;
+				
+				for (i=1;i<=contador-1;i++) 
+				{
+					   registrosT = registrosT +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+				}
+				
+				registrosT = registrosT +"</tr>"; 
+			
+			}
+			
+			});
+			
+			
+			
+			$('#Atraso').html(Tabela_Atraso);
+			$('#tabela_Atraso_registros').html(registros+registrosT);
+		}).always(function() {
+				console.log("terminou atraso");
+		});	
+	}
+		
+	//Popula PDD
+	function popula_PDD()
+	{
+		var Tabela_PDD = HeadTabela+"<th>Faixa Provisao</th>";
+		var registros = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=PDD', function(data) {	
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_PDD = Tabela_PDD + "<th >"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_PDD = Tabela_PDD + "</tr></thead><tbody id='tabela_PDD_registros'></tbody></table></div>";
+			
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+				registros = registros +"<td>"+val[0]+"</td>";
+			    var i = 0;
+				
+				for (i=0;i<=contador-1;i++) 
+				{                                    
+				   registros = registros +"<td> R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+"</td>";
+				}
+				
+				registros = registros +"</tr>"; 
+			
+			});
+			
+			$('#PDD').html(Tabela_PDD);
+			$('#tabela_PDD_registros').html(registros);
+		}).always(function() {
+				console.log("terminou pdd");
+		});	
+	
+	}
+	
+	//Popula Cedente
+	function popula_Cedente()
+	{
+		var Tabela_Cedente = HeadTabela+"<th>Cedente</th>";
+		var registros = "<tr>";
+		var registrosT = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=Top10Cedentes', function(data) {	
+			
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_Cedente = Tabela_Cedente + "<th>"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_Cedente = Tabela_Cedente + "</tr></thead><tbody id='tabela_Cedente_registros'></tbody></table></div>";
+			
+			var tdAux    = "<td>";
+			var tdAuxFim = "</td>"; 
+			 
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+				
+			 if (key == 0)
+			 {
+				tdAux    = "<td style='color:#000' ><b>";
+				tdAuxFim = "</b></td>"; 
+			 }else
+			 {
+				tdAux    = "<td>";
+				tdAuxFim = "</td>"; 
+			 }
+			 
+			 
+			 
+			 if (key !=0)
+			 {
+
+					registros = registros +tdAux+val[0]+tdAuxFim;
+					var i = 0;
+					
+					for (i=0;i<=contador-1;i++) 
+					{                                    
+						if (i==1 || i==3)
+						{
+							registros = registros +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+						}else{
+							registros = registros +tdAux+" R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+						}
+					}
+					registros = registros +"</tr>"; 
+				
+			}else{
+
+					registrosT = registrosT +tdAux+val[0]+tdAuxFim;
+					var i = 0;
+					
+					for (i=0;i<=contador-1;i++) 
+					{                                    
+						if (i==1 || i==3)
+						{
+							registrosT = registrosT +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+						}else{
+							registrosT = registrosT +tdAux+" R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+						}
+					}
+					registrosT = registrosT +"</tr>"; 
+
+			}			
+				
+				
+				
+			});
+			
+			$('#Cedente').html(Tabela_Cedente);
+			$('#tabela_Cedente_registros').html(registros+registrosT);
+		
+		}).always(function() {
+				console.log("terminou cedente");
+		});	
+		
+	}
+	
+	//Popula Sacado
+	function popula_Sacado()
+	{
+		var Tabela_Sacado = HeadTabela+"<th>Sacado</th>";
+		var registros = "<tr>";
+		var registrosT = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=Top10Sacados', function(data) {	
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_Sacado = Tabela_Sacado + "<th >"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_Sacado = Tabela_Sacado + "</tr></thead><tbody id='tabela_Sacado_registros'></tbody></table></div>";
+			
+			//Valores 
+			var tdAux    = "<td>";
+			var tdAuxFim = "</td>"; 
+			 
+			//Valores 
+			$.each(data.result.data, function(key, val) {
+				
+			 if (key == 0)
+			 {
+				tdAux    = "<td style='color:#000'><b>";
+				tdAuxFim = "</b></td>"; 
+			 }else
+			 {
+				tdAux    = "<td>";
+				tdAuxFim = "</td>"; 
+			 }
+			 
+			 
+			 if (key != 0)
+			 {
+				registros = registros +tdAux+val[0]+tdAuxFim;
+			    var i = 0;
+				
+				for (i=0;i<=contador-1;i++) 
+				{                                    
+				    if (i==1 || i==3)
+					{
+					    registros = registros +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+					}else{
+						registros = registros +tdAux+" R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+					}
+				}
+				registros = registros +"</tr>"; 
+	 
+			}else{
+			
+				registrosT = registrosT +tdAux+val[0]+tdAuxFim;
+			    var i = 0;
+				
+				for (i=0;i<=contador-1;i++) 
+				{                                    
+				    if (i==1 || i==3)
+					{
+					    registrosT = registrosT +tdAux+parseFloat(val[i+1]*100).toFixed(2)+"%"+tdAuxFim;
+					}else{
+						registrosT = registrosT +tdAux+" R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+					}
+				}
+				registrosT = registrosT +"</tr>"; 
+			
+			
+			 }
+	 
+			});
+			
+			
+			
+			
+			
+			$('#Sacado').html(Tabela_Sacado);
+			$('#tabela_Sacado_registros').html(registros+registrosT);
+		}).always(function() {
+				console.log("terminou sacado");
+		});	
+	}
+	
+	//Popula Regressado
+	function popula_Regressado()
+	{
+		var Tabela_Regressado = HeadTabela+"<th align='left'>Cedente</th>";
+		var registros = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=Regressado', function(data) {	
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_Regressado = Tabela_Regressado + "<th >"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_Regressado = Tabela_Regressado + "</tr></thead><tbody id='tabela_Regressado_registros'></tbody></table></div>";
+			
+			//Valores registros = 
+			$.each(data.result.data, function(key, val) {
+				registros = registros +"<tr class='abre_5_sacados' id='"+val[0]+"'><td align='left'>"+val[0]+"</td>";
+			    var i = 0;
+				
+				for (i=0;i<=contador-1;i++) 
+				{                                    
+				    if (i==0 || i==2)
+					{
+					    registros = registros +"<td>"+val[i+1]+"</td>";
+					}else{
+						registros = registros +"<td> R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+"</td>";
+					}
+				}
+				
+				registros = registros +"</tr>"; 
+			
+			});
+			
+			$('#Regressado').html(Tabela_Regressado);
+			$('#tabela_Regressado_registros').html(registros);
+		}).always(function() {
+			//Grafico Regressado
+			var categorias1 = new Array();
+			var categorias2 = new Array();
+			var categorias3 = new Array();
+
+			//Monta Grafico
+			$.getJSON(caminhoXaction+'getData=Regressado', function(data) {	
+					$.each(data.result.data, function(key, val) {
+							categorias1[key] =  new Array(val[0], Math.round(parseFloat(getNum(val[2]))));
+							categorias2[key] =  new Array(val[0], Math.round(parseFloat(getNum(val[3]))));
+							categorias3[key] =  new Array(val[0], Math.round(parseFloat(getNum(val[1]))));
+					});
+
+			}).always(function() {
+					//Chama função que gera o grafico e passa o array com os valores
+					CriarChart_Pizza2(categorias1,'','','container_graficoRegressado');
+					CriarBarra(categorias2,'Grafico_Quantidade_Titulos','Qtd de Titulos','bar','');
+					CriarBarra(categorias3,'Grafico_Barra_5_Sacados','Qtd de Sacados','column','Top 10 Sacados');
+					Top5Sacados(categorias1[0].name);
+			});
+		});	
+	}
+	
+	//Top 5 Sacados do Cedennte
+	function Top5Sacados(cedente)
+	{
+	var categorias1 = new Array();
+			//Monta Grafico
+			$.getJSON(caminhoXaction+'getData=Top5Sacados&Cedente='+cedente, function(data) {	
+					$.each(data.result.data, function(key, val) {
+						
+						if (key > 0){
+							categorias1[key-1] =  new Array(val[0], Math.round(parseFloat(getNum(val[1]))));
+						}
+					});
+
+			}).always(function() {
+					CriarBarra(categorias1,'Grafico_Barra_5_Sacados','Em Aberto','column','Top 10 Sacados: ' +cedente);
+			});
+	}
+	
+	//Popula TicketMedio
+	function popula_TicketMedio()
+	{
+		var Tabela_TicketMedio = HeadTabela+"<th>Mes</th>";
+		var registros = "<tr>";
+		var registrosT = "<tr>";
+		var contador  = 0;
+		
+		$.getJSON(caminhoXaction+'getData=TicketMedio', function(data) {	
+			//Titulo
+			$.each(data.result.metadata.columns, function(key, val) {
+				if (key > 0 ){
+					Tabela_TicketMedio = Tabela_TicketMedio + "<th >"+val+"</th>";
+					contador = contador+1;
+				}
+			});
+			Tabela_TicketMedio = Tabela_TicketMedio + "</tr></thead><tbody id='tabela_TicketMedio_registros'></tbody></table></div>";
+			
+			//Valores 
+			var tdAux = "<td>";
+			var tdAuxFim = "</td>";
+			
+			$.each(data.result.data, function(key, val) {
+				
+			 if (key == 0)
+			 {
+				tdAux    = "<td style='color:#000'><b>";
+				tdAuxFim = "</b></td>"; 
+			 }else
+			 {
+				tdAux    = "<td>";
+				tdAux
+				Fim = "</td>"; 
+			 }
+			 
+			 
+			if (key != 0)
+            {			
+				
+				registros = registros +tdAux+val[0]+tdAuxFim;
+			    var i = 0;
+				
+					for (i=0;i<=contador-1;i++) 
+					{                                    
+						if (i==0 || i==2)
+						{
+							registros = registros +tdAux+"R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+						}else{
+							registros = registros +tdAux+val[i+1]+tdAuxFim;
+						}
+					}
+					registros = registros +"</tr>"; 
+			}else{
+			
+			
+				registrosT = registrosT +tdAux+val[0]+tdAuxFim;
+				var i = 0;
+
+				for (i=0;i<=contador-1;i++) 
+				{                                    
+					if (i==0 || i==2)
+					{
+						registrosT = registrosT +tdAux+"R$ "+formatNumber(parseFloat(val[i+1]).toFixed(2))+tdAuxFim;
+					}else{
+						registrosT = registrosT +tdAux+val[i+1]+tdAuxFim;
+					}
+				}
+				registrosT = registrosT +"</tr>"; 
+			
+			
+			}
+			
+			
+			
+			});
+			
+			
+			
+			
+			
+			$('#Ticket').html(Tabela_TicketMedio);
+			$('#tabela_TicketMedio_registros').html(registros+registrosT);
+		}).always(function() {
+				console.log("terminou ticket-medio");
+		});	
+	}
+	
+	
+	//Configura Funções para chamar os graficos
+	$(function(){
+		//clic na celula da tabela
+		 $('.celula_tabela').live('click', function () {
+		 	var Linha            = $(this).attr('name'); 
+			var Valor            = $(this).attr('value'); 
+			var categoriasLabels = new Array();
+			var categorias       = new Array();
+			var _renderizar      = 'td_limpa_'+Linha;
+			
+			console.log(_renderizar);
+			
+			if (Linha == linhaClicada)
+			{
+				popula_Liquidez(); 
+			}
+			else{
+			   
+				popula_Liquidez();
+				linhaClicada = Linha;
+				
+				
+				console.log("----------------------------------");
+				console.log(_renderizar);
+				
+				$.getJSON(caminhoXaction+"getData=Liquidez", function(data) {	
+						//colunas
+						$.each(data.result.metadata.columns, function(key, val) {
+							if (key > 1 ){
+								categorias[key-2] = val;
+							}
+						});
+						//Valores
+						$.each(data.result.data, function(key, val) {
+							if (val[0] == Valor){
+								for (i=0; i< categorias.length; i++)
+								{
+									categoriasLabels[i] =  new Array(categorias[i], parseFloat(val[i+2])*100);
+								}
+							}
+						});
+						
+						CriarBarra(categoriasLabels,_renderizar,'liquidez', 'column',Valor);
+						
+				});
+			
+			}
+		 });
+		 
+		 //clic na celula da tabela de  recompra
+		 $('.abre_5_sacados').live('click', function () {
+		 	Top5Sacados($(this).attr('id')); 
+		 });
+
+		 //fecha a area do grafico
+		  $('.fechar_garfico').live('click', function () {
+			 limpaTela();
+		 });
+	});
+  
+});
+
+//Cria grafico de linha
+function CriarChart_Linha2(categorias_, valores_,Nome_,renderTo)
+{
+var chart;
+    $(document).ready(function() {
+        chart = new Highcharts.Chart({
+            chart: {
+                renderTo: renderTo,
+                type: 'line',
+                marginRight: 120,
+                marginBottom: 25
+		    },
+            title: {
+                text: null,//'Geração Mensal',
+                x: -20 //center
+            },
+            subtitle: {
+                text: '',
+                x: -20
+            },
+            xAxis: {
+                categories: categorias_
+            },
+            yAxis: {
+                title: {
+                    text: ''
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080'
+                }]
+            },
+            tooltip: {
+                formatter: function() {
+                        return '<b>'+ this.series.name +'</b><br/>'+
+                        this.x +': '+'R$ '+ formatNumber(this.y);
+                }
+            },
+            legend: {
+                layout: 'vertical',
+                align: 'right',
+                verticalAlign: 'top',
+                x: 10,
+                y: 60,
+                borderWidth: 0,
+				enabled: true				
+            }
+			, credits: {
+                enabled: false
+            }
+			,
+            series: [{
+                name: Nome_,
+                data: valores_
+                }]
+        });
+    });
+}
+
+//Cria Grafico de Pizza
+function CriarChart_Pizza2(categorias_, titulo_,Tipo_,renderTo)
+{   
+	var legenda = '';
+	var chart;
+    $(document).ready(function() {
+		chart = new Highcharts.Chart({
+            chart: {
+                renderTo: renderTo,
+                plotShadow: false
+            },
+            title: {
+                text: titulo_
+            },
+            tooltip: {
+                formatter: function() {
+					   if (Tipo_ == "Porcentagem"){
+								legenda ='<b>'+this.point.name +'</b>: '+this.y.toFixed(2)+'%';
+					   }else{
+								legenda ='<b>'+this.point.name +'</b>: '+ 'R$'+moeda(this.y,2,',','.');
+					   }
+					  return legenda;
+				}
+            },
+			 legend: {
+				align: 'left',
+  			    layout: 'vertical',
+				verticalAlign: 'left',
+				padding:10,
+				y: 50
+			},
+			 credits: {
+                enabled: false
+            },
+            plotOptions: {
+                pie: {
+                    allowPointSelect: false,
+                    cursor: 'pointer',
+                    dataLabels: {
+                        enabled: false,
+                        color: '#000000',
+                        connectorColor: '#000000',
+                        formatter: function() {
+                            return '<b>'+ this.point.name +':</b><br> '+ this.y;
+                        },
+					}					
+					,showInLegend: true
+			    }
+			}, 
+				series: [{
+                type: 'pie',
+                name: 'pie	',
+                data: categorias_, 
+			    innerSize: 45
+			}] 
+		});
+    });
+}
+
+/*Grafico de Barras*/
+function CriarBarra(categorias_,renderTo_ ,name_,type_,titulo_){
+
+var chart;
+    $(document).ready(function() {
+        chart = new Highcharts.Chart({
+            chart: {
+                renderTo: renderTo_,
+                type: type_ 
+            },
+            title: {
+                text: titulo_
+            },
+            tooltip: {
+                formatter: function() {
+					if (type_ == 'column')
+					{
+					  return 'R$'+moeda(this.y,2,',','.');
+					}else
+					{
+					  return this.y;
+					}
+				}
+			},
+            
+			subtitle: {
+                text: null
+            },
+            xAxis: {
+                categories: categorias_,
+                title: {
+                    text: null
+                },labels: {
+					style: {
+                     fontSize: '9px',
+                     fontFamily: 'Verdana, sans-serif'
+					}
+					, formatter: function () {
+						return this.value[0];
+					}
+				 }
+			},
+            yAxis: {
+                min: 0,
+                title: {
+                    text: null,
+                    align: 'high'
+				},
+                labels: {
+                    overflow: 'justify'
+			    }
+            },
+            
+            plotOptions: {
+                bar: {
+                    dataLabels: {
+                        enabled: true
+				    }
+			    }
+				,column: {
+                    dataLabels	:{
+						formatter: function() {
+                            return 'R$'+moeda(this.y,2,',','.');
+                        }
+					}
+					
+				}
+				
+            },
+            legend: {
+                layout: 'vertical',
+                align: 'right',
+                verticalAlign: 'top',
+                x: 0,
+                y: 50,
+                floating: true,
+                borderWidth: 0,
+                backgroundColor: '#FFFFFF',
+                shadow: true
+            },
+            credits: {
+                enabled: false
+            },
+            series:[{
+                name: name_,
+                data:categorias_
+					}
+				]
+        });
+    });
+	
+}
+</script>

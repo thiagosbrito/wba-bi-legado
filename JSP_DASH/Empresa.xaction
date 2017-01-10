@@ -1,0 +1,315 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<action-sequence> 
+  <title>getData</title>
+  <version>1</version>
+  <logging-level>ERROR</logging-level>
+  <documentation> 
+    <author>Rpassos</author>  
+    <description>MDX Query to JSON</description>  
+    <help/>  
+    <result-type/>  
+    <icon/> 
+  </documentation>
+
+  <inputs> 
+    <callback type="string"> 
+      <sources> 
+        <request>callback</request> 
+      </sources>  
+      <default-value/> 
+    </callback>  
+    <getData type="string"> 
+      <sources> 
+        <request>getData</request> 
+      </sources>  
+      <default-value><![CDATA[1]]></default-value> 
+    </getData>  
+  </inputs>
+
+  <outputs> 
+    <out type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </out>  
+    <json_done type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </json_done> 
+  </outputs>
+
+  <resources> 
+    <catalog> 
+      <solution-file> 
+		<location>solution:_WBA-FI/3.Comercial/wbafi_comercial.mondrian.xml</location>
+        <mime-type>text/plain</mime-type>
+      </solution-file> 
+    </catalog> 
+  </resources>
+  
+  <!-- Mapeamento dos parametros-->  
+  <!-- variaveis de saida-->  
+  <!-- Schemas XML-->  
+<actions>
+
+
+  <actions> 
+      <condition><![CDATA[getData == "1"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+		  <catalog>WBA-FI Comercial</catalog>	
+          <jndi>dw_wba_fi_comercial</jndi>          
+          <query><![CDATA[
+	
+	SELECT dm023_001 as CodEmpresa
+      ,substring(dm023_010,1,charindex(' ',dm023_010)) as  nm_empresa
+      ,dm023_040 as grp_economico
+	FROM tctbdm023
+	where dm023_001 in (1,2)
+		
+]]></query>
+	    <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+	columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+	json.append(QL).append(formataJSON(rowData));
+	json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+	
+	
+	
+	
+	
+	<actions> 
+      <condition><![CDATA[getData == "2"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        
+		<component-definition>
+		  <catalog>WBA-FI Comercial</catalog>	
+          <jndi>dw_wba_fi_comercial</jndi>          
+          <query><![CDATA[
+		
+				select DM023_001 as id, DM023_010 as descricao from TCTBDM023
+				where dm023_001 in (1,2)
+
+		
+]]></query> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+	columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+	json.append(QL).append(formataJSON(rowData));
+	json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+   
+
+   </actions>
+  
+
+</action-sequence>

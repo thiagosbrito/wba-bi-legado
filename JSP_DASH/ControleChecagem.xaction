@@ -1,0 +1,1347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<action-sequence> 
+  <title>Dados</title>
+  <version>1</version>
+  <logging-level>ERROR</logging-level>
+  <documentation> 
+    <author>Rpassos</author>  
+    <description>MDX Query to JSON</description>  
+    <help/>  
+    <result-type/>  
+    <icon/> 
+  </documentation>
+  <inputs> 
+    <callback type="string"> 
+      <sources> 
+        <request>callback</request> 
+      </sources>  
+      <default-value/> 
+    </callback>  
+    <getData type="string"> 
+      <sources> 
+        <request>getData</request> 
+      </sources>  
+      <default-value><![CDATA[1]]></default-value> 
+    </getData>  
+    <Ano type="string"> 
+      <sources> 
+        <request>Ano</request> 
+      </sources>  
+      <default-value><![CDATA[2001]]></default-value> 
+    </Ano>  
+    <Cedente type="string"> 
+      <sources> 
+        <request>Cedente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Cedente>  
+    <Mes type="string"> 
+      <sources> 
+        <request>Mes</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Mes>  
+    <Sacado type="string"> 
+      <sources> 
+        <request>Sacado</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Sacado>  
+    <Gerente type="string"> 
+      <sources> 
+        <request>Gerente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Gerente> 
+  </inputs>
+  <outputs> 
+    <out type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </out>  
+    <json_done type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </json_done> 
+  </outputs>
+  <resources> 
+    <catalog>
+	<solution-file>
+        <catalog>Operacoes de Credito</catalog>     
+        <mime-type>text/plain</mime-type>
+  </solution-file>
+    </catalog> 
+  </resources>
+  
+  <!-- Mapeamento dos parametros-->  
+  <!-- variaveis de saida-->  
+  <!-- Schemas XML-->  
+  <actions> 
+   
+
+
+
+ <!-- **************************************CarteiraTotal************************** -->  
+    <actions> 
+      <condition><![CDATA[getData == "CarteiraTotal"]]></condition>  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi><![CDATA[dw_wba_fi]]></jndi>  
+          <catalog>Operacoes de Credito</catalog>   
+          <query><![CDATA[
+			
+			   WITH
+          MEMBER [Measures].[%] AS
+              ([Measures].[Valor do Titulo] / Sum({[Operacoes.Operacoes : Codigo].[Titulos].[040], [Operacoes.Operacoes : Codigo].[Titulos].[041], [Operacoes.Operacoes : Codigo].[Pendencias].[043], [Operacoes.Operacoes : Codigo].[Titulos].[046]}, [Measures].[Valor do Titulo]))
+          SET [~ROWS] AS
+              {[Operacoes.Operacoes : Codigo].[Titulos].[040], [Operacoes.Operacoes : Codigo].[Titulos].[041], [Operacoes.Operacoes : Codigo].[Pendencias].[043], [Operacoes.Operacoes : Codigo].[Titulos].[046]}
+          SELECT
+          NON EMPTY {[Measures].[Valor do Titulo], [Measures].[%]} ON COLUMNS,
+          NON EMPTY [~ROWS] ON ROWS
+          FROM [Operacoes de Credito]
+			
+]]></query> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+  <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+var s = null;
+if (v == null) {
+s = 'null';
+} else if (v instanceof java.lang.String) {
+s = '"' + v + '"';
+} else if (v instanceof java.util.Date) {
+s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+} else if (v instanceof Array) {
+s = new java.lang.StringBuilder("[ ");
+for (var i=0; i<v.length; i++) {
+if (i>0) {
+s.append(',');
+}
+s.append(formataJSON(v[i]));
+}
+s.append(" ]");
+} else {
+s = v.toString();
+}
+if (DEBUG) {
+ s = s.toString() + " /* " + v.getClass().getName() + " */";
+}
+return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+'"metadata": { ' +
+'"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+'"rows": ' + rowCount + ', ' + QL +
+'"cols": ' + (colCount+1) + QL +
+' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+json.append(QL).append(formataJSON(rowData));
+json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+json = callback + '(' + json.toString() + ')'
+} else {
+json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions> 
+	
+
+	
+<!-- ********************************ResumoDaChecagem******************************** -->  
+    <actions> 
+      <condition><![CDATA[getData == "ResumoDaChecagem"]]></condition>  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi><![CDATA[dw_wba_fi]]></jndi>  
+          <catalog>Operacoes de Credito</catalog>   
+          <query><![CDATA[
+			WITH
+        MEMBER [Measures].[%] AS
+            ([Measures].[Valor do Titulo] / Sum([Checagem].[Checagem].Members, [Measures].[Valor do Titulo])), FORMAT_STRING = "##.##%"
+        SET [~ROWS] AS
+            {[Checagem].[Checagem].Members}
+        SELECT
+        NON EMPTY {[Measures].[Qtde de Titulo], [Measures].[Valor do Titulo], [Measures].[%]} ON COLUMNS,
+        NON EMPTY [~ROWS] ON ROWS
+        FROM [Operacoes de Credito]
+			
+]]></query> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+  <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+var s = null;
+if (v == null) {
+s = 'null';
+} else if (v instanceof java.lang.String) {
+s = '"' + v + '"';
+} else if (v instanceof java.util.Date) {
+s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+} else if (v instanceof Array) {
+s = new java.lang.StringBuilder("[ ");
+for (var i=0; i<v.length; i++) {
+if (i>0) {
+s.append(',');
+}
+s.append(formataJSON(v[i]));
+}
+s.append(" ]");
+} else {
+s = v.toString();
+}
+if (DEBUG) {
+ s = s.toString() + " /* " + v.getClass().getName() + " */";
+}
+return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+'"metadata": { ' +
+'"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+'"rows": ' + rowCount + ', ' + QL +
+'"cols": ' + (colCount+1) + QL +
+' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+json.append(QL).append(formataJSON(rowData));
+json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+json = callback + '(' + json.toString() + ')'
+} else {
+json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions> 
+
+
+
+
+
+
+
+  <!-- ********************************TitulosAVencer******************************** -->  
+  <actions> 
+      <condition><![CDATA[getData == "TitulosAVencer"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+      <catalog>WBA-FI Comercial</catalog> 
+          <jndi>dw_wba_fi_comercial</jndi>          
+          <query><![CDATA[
+  
+    select 
+         dm60.dm060_001 CodigoOperacao
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = getDate()   then isnull(fato.opft001_110,0) else 0 end) as D0
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,1,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D1
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,2,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D2
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,3,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D3
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,4,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D4
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,5,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D5
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,6,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D6
+        ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,7,getDate())  then isnull(fato.opft001_110,0) else 0 end) as D7 
+        ,sum(case when dm62.dm062_000 in (1)   then isnull(fato.opft001_110,0) else 0 end) as TotalAVencer
+    from optbft001 fato
+      inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 ---sacado
+      inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 ---cliente
+      inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 ---situacao de pagamento
+      inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 ---tipo de lançamento
+      inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000 ---empresa  
+      inner join TCTBDM028 temp       on fato.sk_data_pgto = temp.DM028_000
+    where 
+      dm60.dm060_001 in('040','041','043','046')
+      and fato.dm003_000 <> 6
+      and dm23.dm023_001 in(1,2)  
+      and fato.dm012_000 in(1,3)    
+      and dm62.dm062_000 not in(3)
+    group by dm60.dm060_001 
+    
+]]></query>
+      <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+  columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+  json.append(QL).append(formataJSON(rowData));
+  json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+  
+
+
+
+
+
+<!-- ********************************TitulosVencidos******************************** -->  
+  <actions> 
+      <condition><![CDATA[getData == "TitulosVencidos"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+      <catalog>WBA-FI Comercial</catalog> 
+          <jndi>dw_wba_fi_comercial</jndi>          
+          <query><![CDATA[
+  
+    Select 
+     x.CodigoOperacao
+    ,x.vcd_5_dias
+    ,x.vcd_6_15_dias
+    ,x.vcd_16_30_dias
+    ,x.vcd_31_60_dias
+    ,x.vcd_mais_60_dias
+    ,x.TotalVencido
+    ,'%' Percent_Vencidos
+   ,((x.TotalVencido/x.carteira)*100) Percent_Vencidos_Sob_carteira
+   ,x.EmCartorio
+   ,x.Protesto
+from
+(
+select   dm60.dm060_001 CodigoOperacao,
+    sum(case when (dm62.dm062_000 in (2) and fx.sk_fx_pgto = 2)   then isnull(fato.opft001_110,0) else 0 end) as vcd_5_dias,    
+    sum(case when (dm62.dm062_000 in (2) and fx.sk_fx_pgto = 3)   then isnull(fato.opft001_110,0) else 0 end) as vcd_6_15_dias,   
+    sum(case when (dm62.dm062_000 in (2) and fx.sk_fx_pgto = 4)   then isnull(fato.opft001_110,0) else 0 end) as vcd_16_30_dias,
+    sum(case when (dm62.dm062_000 in (2) and fx.sk_fx_pgto = 5)   then isnull(fato.opft001_110,0) else 0 end) as vcd_31_60_dias,
+    sum(case when (dm62.dm062_000 in (2) and fx.sk_fx_pgto = 6)   then isnull(fato.opft001_110,0) else 0 end) as vcd_mais_60_dias,  
+    sum(case when dm62.dm062_000 in  (2)   then isnull(fato.opft001_110,0) else 0 end) as TotalVencido,
+    sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as carteira,
+    sum(case when dm62.dm062_000 not in(3) and sit.DM061_001 = 1    then isnull(fato.opft001_110,0) else 0 end) as EmCartorio,
+    sum(case when dm62.dm062_000 not in(3) and sit.DM061_001 = 3    then isnull(fato.opft001_110,0) else 0 end) as Protesto
+  from optbft001 fato
+    inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 ---sacado
+    inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 ---cliente
+    inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 ---situacao de pagamento
+    inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 ---tipo de lançamento
+    inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000 ---empresa  
+    inner join TCTBDM028 temp       on fato.sk_data_pgto = temp.DM028_000
+    inner join fntbdm_faixa_pgto fx on fx.sk_fx_pgto  = fato.sk_faixa_vcto ---faixa de pagamento
+    inner join OPTBDM061 sit        on sit.DM061_000  = fato.DM061_000
+  where 
+    dm60.dm060_001 in('040','041','043','046')
+    and fato.dm003_000 <> 6
+    and dm23.dm023_001 in(1,2)  
+    and fato.dm012_000 in(1,3)    
+    and dm62.dm062_000 =2
+  group by dm60.dm060_001 
+)x  
+    
+]]></query>
+      <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+  columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+  json.append(QL).append(formataJSON(rowData));
+  json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+
+
+
+
+
+
+<!-- ********************************SituacaoChecagemTop15******************************** -->  
+  <actions> 
+      <condition><![CDATA[getData == "SituacaoChecagemTop15"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+      <catalog>WBA-FI Comercial</catalog> 
+          <jndi>dw_wba_fi</jndi>          
+          <query><![CDATA[
+  
+        select  Top 15
+            dm01.DM001_010,
+            sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as carteira,
+            sum(case when dm62.dm062_000 in (1,2) and fato.dm031_000 = 4 then coalesce(fato.opft001_110,0) else 0 end)as vlr_comproblema,
+            (sum(case when dm62.dm062_000 in (1,2)and fato.dm031_000 = 4 then coalesce(fato.opft001_110,0) else 0 end)/
+            case when (sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end)) =0 then 1
+            else (sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end))end 
+            *100) Percent_Problema
+        from optbft001 fato
+          inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+          inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+          inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+          inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+          inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+          inner join TCTBDM028 temp       on fato.sk_data_pgto = temp.DM028_000
+          inner join fntbdm_faixa_pgto fx on fx.sk_fx_pgto  = fato.sk_faixa_vcto 
+          inner join OPTBDM061 sit        on sit.DM061_000  = fato.DM061_000
+        where 
+          dm60.dm060_001 in('040','041','043','046')
+          and fato.dm003_000 <> 6
+          and dm23.dm023_001 in(1,2)  
+          and fato.dm012_000 in(1,3)    
+        group by dm01.DM001_000,dm01.DM001_010
+        order by 3 desc
+  
+]]></query>
+      <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+  columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+  json.append(QL).append(formataJSON(rowData));
+  json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+
+
+
+
+   <!-- ********************************TitulosPorBancoLiquidacao******************************** -->  
+    <actions> 
+      <condition><![CDATA[getData == "TitulosPorBancoLiquidacao"]]></condition>  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi><![CDATA[dw_wba_fi]]></jndi>  
+          <catalog>Operacoes de Credito</catalog>   
+          <query><![CDATA[
+      
+            WITH
+            MEMBER [Measures].[%] AS
+                ([Measures].[Valor do Titulo] / Sum({Ancestor([Banco Liquidacao.Banco].[Banco].CurrentMember, 1.0)}, 
+                [Measures].[Valor do Titulo])), FORMAT_STRING = "#0.00%"
+            SET [~ROWS] AS
+                {[Banco Liquidacao.Banco].[Banco].Members}
+            SELECT
+            NON EMPTY {[Measures].[Valor do Titulo], [Measures].[%]} ON COLUMNS,
+            NON EMPTY [~ROWS] ON ROWS
+            FROM [Operacoes de Credito]
+      
+]]></query> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+  <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+var s = null;
+if (v == null) {
+s = 'null';
+} else if (v instanceof java.lang.String) {
+s = '"' + v + '"';
+} else if (v instanceof java.util.Date) {
+s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+} else if (v instanceof Array) {
+s = new java.lang.StringBuilder("[ ");
+for (var i=0; i<v.length; i++) {
+if (i>0) {
+s.append(',');
+}
+s.append(formataJSON(v[i]));
+}
+s.append(" ]");
+} else {
+s = v.toString();
+}
+if (DEBUG) {
+ s = s.toString() + " /* " + v.getClass().getName() + " */";
+}
+return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+'"metadata": { ' +
+'"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+'"rows": ' + rowCount + ', ' + QL +
+'"cols": ' + (colCount+1) + QL +
+' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+json.append(QL).append(formataJSON(rowData));
+json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+json = callback + '(' + json.toString() + ')'
+} else {
+json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions> 
+
+
+   
+   <!-- ********************************ContratosProximosAoVencimento******************************** -->  
+  <actions> 
+      <condition><![CDATA[getData == "ContratosProximosAoVencimento"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+      <catalog>WBA-FI Comercial</catalog> 
+          <jndi>dw_wba_fi</jndi>          
+          <query><![CDATA[
+  
+            select  Top 15
+              dm01.DM001_010
+              ,'N/A' DataContrato 
+              ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010)  = dateadd(day,60,getDate()) then isnull(fato.opft001_110,0) else 0 end) as AVencer60d
+              ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010)  = dateadd(day,30,getDate()) then isnull(fato.opft001_110,0) else 0 end) as AVencer30d
+              ,sum(case when dm62.dm062_000 in (1) and convert(date,temp.DM028_010) = dateadd(day,10,getDate()) then isnull(fato.opft001_110,0) else 0 end) as AVencer30d   
+              ,sum(case when dm62.dm062_000 in (2) then isnull(fato.opft001_110,0) else 0 end) as Vencidos
+              
+          from optbft001 fato
+            inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+            inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+            inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+            inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+            inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+            inner join TCTBDM028 temp       on fato.sk_data_pgto = temp.DM028_000
+            inner join OPTBDM061 sit        on sit.DM061_000  = fato.DM061_000
+          where 
+            dm60.dm060_001 in('040','041','043','046')
+            and fato.dm003_000 <> 6
+            and dm23.dm023_001 in(1,2)  
+            and fato.dm012_000 in(1,3)    
+          group by dm01.DM001_000,dm01.DM001_010, dm01.DM001_020
+          order by 2 desc 
+              
+]]></query>
+      <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+  columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+  json.append(QL).append(formataJSON(rowData));
+  json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+
+   
+    
+     <!-- ********************************CedenteEmAlerta******************************** -->  
+  <actions> 
+      <condition><![CDATA[getData == "CedenteEmAlerta"]]></condition>  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition>
+      <catalog>WBA-FI Comercial</catalog> 
+          <jndi>dw_wba_fi</jndi>          
+          <query><![CDATA[
+  
+       Select  Top 15 * from(
+
+          Select  
+          x.DM001_010 ,
+          ((x.Liquidado/x.Total)*100) Percent_, 
+           'Liquidados' DescStatus
+          from 
+          (
+          select  
+              dm01.DM001_010
+             ,sum(case when dm62.dm062_000 in (1,2,3) then isnull(fato.opft001_110,0) else 0 end) as Total
+             ,sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as Aberto
+             ,sum(case when dm62.dm062_000 in (3) then isnull(fato.opft001_110,0) else 0 end) as Liquidado
+          from optbft001 fato
+            inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+            inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+            inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+            inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+            inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+            inner join TCTBDM028 temp   on fato.sk_data_pgto = temp.DM028_000
+            inner join OPTBDM061 sit    on sit.DM061_000  = fato.DM061_000
+          where 
+            dm60.dm060_001 in('040','041','043','046')
+            and fato.dm003_000 <> 6
+            and dm23.dm023_001 in(1,2)  
+            and fato.dm012_000 in(1,3)    
+          group by dm01.DM001_000,dm01.DM001_010, dm01.DM001_020
+          )x
+          where  ((x.Liquidado/x.Total)*100) >= 0 
+          and    ((x.Liquidado/x.Total)*100) <= 85.0
+
+          UNION ALL
+          Select  x.DM001_010 ,
+                ((x.Vencidos/x.Total)*100) Percent_, 
+                 'Vencidos' DescStatus
+          from 
+          (
+          select  
+              dm01.DM001_010
+             ,sum(case when dm62.dm062_000 in (1,2,3) then isnull(fato.opft001_110,0) else 0 end) as Total
+             ,sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as Aberto
+             ,sum(case when dm62.dm062_000 in (2) then isnull(fato.opft001_110,0) else 0 end) as Vencidos
+          from optbft001 fato
+            inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+            inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+            inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+            inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+            inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+            inner join TCTBDM028 temp   on fato.sk_data_pgto = temp.DM028_000
+            inner join OPTBDM061 sit    on sit.DM061_000  = fato.DM061_000
+          where 
+            dm60.dm060_001 in('040','041','043','046')
+            and fato.dm003_000 <> 6
+            and dm23.dm023_001 in(1,2)  
+            and fato.dm012_000 in(1,3)    
+          group by dm01.DM001_000,dm01.DM001_010, dm01.DM001_020
+          )x
+          where  ((x.Vencidos/x.Total)*100) >= 9.9
+          and    ((x.Vencidos/x.Total)*100) <= 100
+
+          UNION ALL
+          Select  x.DM001_010 ,
+                ((x.Liquidado/x.Total)*100) Percent_, 
+                 'Regressado' DescStatus
+          from 
+          (
+          select  
+              dm01.DM001_010
+             ,sum(case when dm62.dm062_000 in (1,2,3) then isnull(fato.opft001_110,0) else 0 end) as Total
+             ,sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as Aberto
+             ,sum(case when dm62.dm062_000 in (3) and sit.DM061_001 =8 then isnull(fato.opft001_110,0) else 0 end) as Liquidado
+          from optbft001 fato
+            inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+            inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+            inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+            inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+            inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+            inner join TCTBDM028 temp   on fato.sk_data_pgto = temp.DM028_000
+            inner join OPTBDM061 sit    on sit.DM061_000  = fato.DM061_000
+          where 
+            dm60.dm060_001 in('040','041','043','046')
+            and fato.dm003_000 <> 6
+            and dm23.dm023_001 in(1,2)  
+            and fato.dm012_000 in(1,3)    
+          group by dm01.DM001_000,dm01.DM001_010, dm01.DM001_020
+          )x
+          where  ((x.Liquidado/x.Total)*100) >= 9.9 
+          and    ((x.Liquidado/x.Total)*100) <= 100
+
+          UNION ALL
+          Select DM001_010, (Aberto/case when Limite=0 then Aberto end )*100  Percent_,DescStatus
+          from(
+          Select  x.DM001_010 ,
+                  x.Limite ,
+                  x.Aberto,
+                 'Risco > Limite' DescStatus
+          from 
+          (
+          select  
+              dm01.DM001_010
+             ,sum(case when dm62.dm062_000 in (1,2,3) then isnull(fato.opft001_110,0) else 0 end) as Total
+             ,sum(case when dm62.dm062_000 in (1,2) then isnull(fato.opft001_110,0) else 0 end) as Aberto
+             ,dm01.dm001_200 Limite
+          from optbft001 fato
+            inner join tctbdm022 dm22   on dm22.dm022_000 = fato.dm022_000 
+            inner join tctbdm001 dm01   on dm01.dm001_000 = fato.dm001_000 
+            inner join tctbdm062 dm62   on dm62.dm062_000 = fato.dm062_000 
+            inner join optbdm060 dm60   on dm60.dm060_000 = fato.dm099_000 
+            inner join tctbdm023 dm23   on dm23.dm023_000 = fato.dm023_000   
+            inner join TCTBDM028 temp   on fato.sk_data_pgto = temp.DM028_000
+            inner join OPTBDM061 sit    on sit.DM061_000  = fato.DM061_000
+          where 
+            dm60.dm060_001 in('040','041','043','046')
+            and fato.dm003_000 <> 6
+            and dm23.dm023_001 in(1,2)  
+            and fato.dm012_000 in(1,3)    
+          group by dm01.DM001_000,dm01.DM001_010, dm01.DM001_020,dm001_200
+          )x
+          where  x.Aberto >x.Limite
+          )y
+
+    )W
+    order by 2 desc
+
+              
+]]></query>
+      <location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+  columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+  json.append(QL).append(formataJSON(rowData));
+  json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+
+
+
+  
+  
+  
+  
+   <!-- ********************FIM DO ARQUIVOS ************ -->  
+  </actions> 
+</action-sequence>

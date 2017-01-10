@@ -1,0 +1,233 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<action-sequence> 
+  <title>getData</title>
+  <version>1</version>
+  <logging-level>ERROR</logging-level>
+  <documentation> 
+    <author>Rpassos</author>  
+    <description>MDX Query to JSON</description>  
+    <help/>  
+    <result-type/>  
+    <icon/> 
+  </documentation>
+
+  <inputs> 
+    <callback type="string"> 
+      <sources> 
+        <request>callback</request> 
+      </sources>  
+      <default-value/> 
+    </callback>  
+    <getData type="string"> 
+      <sources> 
+        <request>getData</request> 
+      </sources>  
+      <default-value><![CDATA[1]]></default-value> 
+    </getData>  
+    <Ano type="string"> 
+      <sources> 
+        <request>Ano</request> 
+      </sources>  
+      <default-value><![CDATA[2001]]></default-value> 
+    </Ano>  
+    <Cedente type="string"> 
+      <sources> 
+        <request>Cedente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Cedente>  
+    <Mes type="string"> 
+      <sources> 
+        <request>Mes</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Mes>  
+    <Sacado type="string"> 
+      <sources> 
+        <request>Sacado</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Sacado>  
+    <Gerente type="string"> 
+      <sources> 
+        <request>Gerente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Gerente> 
+  </inputs>
+
+  <outputs> 
+    <out type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </out>  
+    <json_done type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </json_done> 
+  </outputs>
+
+  <resources> 
+    <catalog> 
+      <solution-file> 
+        <location>/2.Credito/Analises/OperacoesCredito.mondrian.xml</location>  
+        <mime-type>text/plain</mime-type> 
+      </solution-file> 
+    </catalog> 
+  </resources>
+  
+  <!-- Mapeamento dos parametros-->  
+  <!-- variaveis de saida-->  
+  <!-- Schemas XML-->  
+  <actions> 
+   
+   
+   <!-- **********************************FACTORING - em aberto/ vencido >90 / vencido <90******** -->  
+    <actions> 
+      <condition><![CDATA[getData == "2"]]></condition>  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <Ano type="string"/>  
+          <Mes type="string"/> 
+  	      <query_result_Empresa type="result-set"/>
+        </action-inputs>
+        <action-outputs> 
+          <strQuery type="string"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+		
+
+strQuery   =   "select DM023_001 as id, DM023_010 as descricao from TCTBDM023 where dm023_001 in (1,2)";
+
+
+;]]> </script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          <Cedente type="string"/>  
+          <Ano type="string"/>  
+          <Mes type="string"/>  
+          <strQuery type="string"/> 
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi><![CDATA[dw_wba_fi]]></jndi>  
+          <catalog>Operacoes de Credito</catalog> 
+          <query><![CDATA[{strQuery}]]></query> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+	columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+	json.append(QL).append(formataJSON(rowData));
+	json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+   
+   
+ 
+  </actions> 
+</action-sequence>

@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<action-sequence> 
+  <title>getData</title>
+  <version>1</version>
+  <logging-level>ERROR</logging-level>
+  <documentation> 
+    <author>Rpassos</author>  
+    <description>MDX Query to JSON</description>  
+    <help/>  
+    <result-type/>  
+    <icon/> 
+  </documentation>
+
+  
+  <inputs> 
+    <callback type="string"> 
+      <sources> 
+        <request>callback</request> 
+      </sources>  
+      <default-value/> 
+    </callback>  
+    <getData type="string"> 
+      <sources> 
+        <request>getData</request> 
+      </sources>  
+      <default-value><![CDATA[1]]></default-value> 
+    </getData>  
+    <Ano type="string"> 
+      <sources> 
+        <request>Ano</request> 
+      </sources>  
+      <default-value><![CDATA[2001]]></default-value> 
+    </Ano>  
+    <Cedente type="string"> 
+      <sources> 
+        <request>Cedente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Cedente>  
+    <Mes type="string"> 
+      <sources> 
+        <request>Mes</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Mes>  
+    <Sacado type="string"> 
+      <sources> 
+        <request>Sacado</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Sacado>  
+    <Gerente type="string"> 
+      <sources> 
+        <request>Gerente</request> 
+      </sources>  
+      <default-value><![CDATA['xx']]></default-value> 
+    </Gerente> 
+  </inputs>
+
+  <outputs> 
+    <out type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </out>  
+    <json_done type="string"> 
+      <destinations> 
+        <response>content</response> 
+      </destinations> 
+    </json_done> 
+  </outputs>
+
+  <resources> 
+    <catalog> 
+      <solution-file> 
+		<location>solution:_WBA-FI/3.Comercial/wbafi_comercial.mondrian.xml</location>
+        <mime-type>text/plain</mime-type> 
+      </solution-file> 
+    </catalog> 
+	<catalog1>
+      <solution-file>
+        <location>solution:_WBA-FI/2.Credito/Analises/OperacoesCredito.mondrian.xml</location>
+        <mime-type>text/plain</mime-type>
+      </solution-file>
+    </catalog1>	
+  </resources>
+  
+  <!-- Mapeamento dos parametros-->  
+  <!-- variaveis de saida-->  
+  <!-- Schemas XML-->  
+  <actions> 
+    <actions> 
+      <action-definition> 
+        <component-name>SQLLookupRule</component-name>
+        <action-type>Relational Ano</action-type>
+        <action-outputs> 
+          <query-result type="result-set" mapping="query_result_Empresa"/>  
+          <ano type="integer"/>  
+          <nm_empresa type="string"/>  
+          <grp_economico type="string"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi>dw_wba_fi_comercial</jndi>  
+          <query><![CDATA[
+		
+SELECT  year(GETDATE()) as ano
+  	,dm023_010 as nm_empresa
+    ,dm023_040 as grp_economico
+FROM tctbdm023
+where dm023_001 in (1,2)
+
+]]></query>
+		  <location>mondrian</location>   
+          <live><![CDATA[true]]></live> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+  
+    <actions> 
+      <condition><![CDATA[getData == "1"]]></condition>  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          <Ano type="string"/> 
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog1"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi>dw_wba_fi</jndi>  
+          <catalog>Operacoes de Credito</catalog>  
+          <query><![CDATA[
+		
+		
+	
+		
+		
+SELECT
+NON EMPTY {Hierarchize({[Measures].[Valor Inclusao]})} ON COLUMNS,
+NON EMPTY {Hierarchize({[Data Inc Contabil.AnoMesDia].[Ano].Members})} ON ROWS
+FROM [Operacoes de Credito]
+WHERE {Hierarchize({{[Operacoes.Operacoes : Codigo].[Titulos].[040], [Operacoes.Operacoes : Codigo].[Titulos].[041], [Operacoes.Operacoes : Codigo].[Titulos].[046]}})}
+
+		
+]]></query> 
+			<location>mondrian</location> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+	columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+	json.append(QL).append(formataJSON(rowData));
+	json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+  
+    <!-- ****************************************** -->  
+    <actions> 
+      <condition><![CDATA[getData == "2"]]></condition>  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+         <Ano type="string"/>
+        </action-inputs>
+        <action-outputs> 
+          <strQuery type="string"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+
+  
+ strQuery    =  "select NON EMPTY {[Periodo.AnoMesAno].[{Ano}].Children} ON COLUMNS,   NON EMPTY Crossjoin([Empresa.Grupo Economico].[Empresa].Members, {[Measures].[Valor Operacao]}) ON ROWS from [ft_comercialrealizada] where Crossjoin({[Modalidade.Produto].[Fomento Mercantil], [Modalidade.Produto].[FIDC]}, {[Tipo de Operacao].[Operacao]}) ";
+
+
+;]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          <strQuery type="string"/> 
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi>dw_wba_fi_comercial</jndi>  
+          <catalog>WBA-FI Comercial</catalog> 
+          <query><![CDATA[{strQuery}
+]]></query> 
+	     <location>mondrian</location>
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result type="result-set"/>  
+          <callback type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <json type="string"/>  
+          <rowCount type="integer"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+QL = ''; 
+DEBUG=false;
+
+function formataJSON(v) {
+        var s = null;
+        if (v == null) {
+            s = 'null';
+        } else if (v instanceof java.lang.String) {
+            s = '"' + v + '"';
+        } else if (v instanceof java.util.Date) {
+            s = /*"new Date(" +*/ v.getTime() /*+ ")"*/;
+        } else if (v instanceof Array) {
+            s = new java.lang.StringBuilder("[ ");
+            for (var i=0; i<v.length; i++) {
+                if (i>0) {
+                    s.append(',');
+                }
+                s.append(formataJSON(v[i]));
+            }
+            s.append(" ]");
+        } else {
+            s = v.toString();
+        }
+        if (DEBUG) {
+             s = s.toString() + " /* " + v.getClass().getName() + " */";
+        }
+        return s.toString();
+}
+
+var rowCount=query_result.getRowCount();
+var colCount=query_result.getColumnCount();
+var json=new java.lang.StringBuilder('{ "result" : {');
+
+var columnHeaders = new Array();
+columnHeaders[0] = '"metrica"';
+for (var col=0; col<colCount; col++) {
+	columnHeaders[col+1] = query_result.getMetaData().getColumnHeaders()[0][col];
+}
+
+json.append( 
+    '"metadata": { ' +
+        '"columns": ' + formataJSON(columnHeaders) + ', ' + QL +
+        '"rows": ' + rowCount + ', ' + QL +
+        '"cols": ' + (colCount+1) + QL +
+    ' },' + QL);
+
+
+json.append('"data" : [ ');
+var rowData = null;
+while (rowData = query_result.nextFlattened()) {
+	json.append(QL).append(formataJSON(rowData));
+	json.append(',');
+}
+json.deleteCharAt(json.length()-1); 
+
+json.append(QL + '] ' + QL);
+
+json.append('}' + QL + '}');
+
+if (callback !== '' || callback === null) {
+    json = callback + '(' + json.toString() + ')'
+} else {
+    json = json.toString();
+}]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs> 
+          <json type="string"/> 
+        </action-inputs>
+        <action-outputs> 
+          <output-message type="string" mapping="out"/> 
+        </action-outputs>
+        <component-definition> 
+          <template><![CDATA[{json}]]></template> 
+        </component-definition> 
+      </action-definition>
+ 
+    </actions>
+  
+    <!-- ****************************************** -->  
+    <actions> 
+      <condition><![CDATA[getData == "3"]]></condition>  
+      <action-definition> 
+        <component-name>JavascriptRule</component-name>
+        <action-type>JavaScript</action-type>
+        <action-inputs> 
+          <query_result_Empresa type="result-set"/> 
+        </action-inputs>
+        <action-outputs> 
+          <strQuery type="string"/> 
+        </action-outputs>
+        <component-definition> 
+          <script><![CDATA[
+		  
+var empresaFACTORING = query_result_Empresa.getValueAt(0,1).toString();
+var grupo_economicoFACTORING = query_result_Empresa.getValueAt(0,2).toString();				
+var empresaFIDC;
+var grupo_economicoFIDC;				
+
+if (query_result_Empresa.length > 0)
+{
+ empresaFIDC = query_result_Empresa.getValueAt(1,1).toString();
+ grupo_economicoFIDC = query_result_Empresa.getValueAt(1,2).toString();				
+}
+			
+
+		strQuery    =  "  	with member [Measures].[ValorFIDC] as 'IIf(([Empresa.Grupo Economico].[NA].["+empresaFIDC+"], [Measures].[Valor Operacao]) IS EMPTY, 0, ([Empresa.Grupo Economico].[NA].["+empresaFIDC+"], [Measures].[Valor Operacao]))'";
+		strQuery   +=  "    member [Measures].[ValorFACTORING] as 'IIf(([Empresa.Grupo Economico].[NA].["+empresaFACTORING+"], [Measures].[Valor Operacao]) IS EMPTY, 0, ([Empresa.Grupo Economico].[NA].["+empresaFACTORING+"], [Measures].[Valor Operacao]))'";
+		strQuery   +=  "    select NON EMPTY {[Measures].[ValorFIDC], [Measures].[ValorFACTORING]} ON COLUMNS,";
+		strQuery   +=  "    NON EMPTY {[Periodo.AnoMesAno].[{Ano}].Children} ON ROWS";
+		strQuery   +=  "    from [ft_comercialrealizada]";
+		strQuery   +=  "	where Crossjoin({[Modalidade.Produto].[Fomento Mercantil], [Modalidade.Produto].[FIDC]}, {[Tipo de Operacao].[Operacao]})";
+
+;]]></script> 
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition> 
+        <component-name>MDXLookupRule</component-name>
+        <action-type>OLAP</action-type>
+        <action-inputs> 
+          <strQuery type="string"/> 
+        </action-inputs>
+        <action-resources> 
+          <catalog mapping="catalog"/> 
+        </action-resources>
+        <action-outputs> 
+          <query-results type="result-set" mapping="query_result"/> 
+        </action-outputs>
+        <component-definition> 
+          <jndi>dw_wba_fi_comercial</jndi>  
+          <catalog>WBA-FI Comercial</catalog>
+          <query><![CDATA[{strQuery}
+]]></query> 
+			<location>mondrian</location>
+        </component-definition> 
+      </action-definition>
+  
+      <action-definition>
+        <component-name>TemplateComponent</component-name>
+        <action-type>Message Template</action-type>
+        <action-inputs>
+          <query_result type="string"/>
+        </action-inputs>
+        <action-outputs>
+          <output-message type="string" mapping="out"/>
+        </action-outputs>
+        <component-definition>
+          <template><![CDATA[{query_result}]]></template>
+        </component-definition>
+      </action-definition>
+
+    </actions>
+ 
+  </actions> 
+</action-sequence>

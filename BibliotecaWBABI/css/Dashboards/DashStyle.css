@@ -1,0 +1,57 @@
+
+
+
+
+
+
+/*Bordas dos dashboard com sombra em CSS3*/
+.BordasArredondadas {
+	
+	border:1px solid #DBDBDB;
+	width:98%;
+	height: 98%;
+	background-color:#C0C0C0;
+	
+
+	/*Bordas arredondadas*/
+         border-radius:18px;
+	-moz-border-radius:18px;
+	-webkit-border-radius:18px;
+	       
+
+	/*Sombra*/
+		 box-shadow: 0 0 .55em #000000; /* Implementação W3C */
+	-moz-box-shadow: 0 0 .55em #000000;  /* Implementação Mozilla */
+	-webkit-box-shadow: 0 0 .55em #000000; /* Implementação para browsers que renderizam via webkit */
+
+	
+	behavior: url('PIE-1.0.0/PIE.htc'); /* Comportamento adicionado para renderização das propriedades acima no IE 7 e IE 8 */
+	}
+
+.BordasArredondadas .Interior
+{
+	border:1px solid #DBDBDB;
+	width:95%;
+	height: 40%;
+	background-color:#FFFFFF;	
+
+}
+
+.BordasArredondadas .Interior2
+{
+	border:1px solid #DBDBDB;
+	height: 95%;
+	background-color:#FFFFFF;	
+	border-radius:18px;
+	box-shadow: 0 0 .55em #000000; 
+}
+
+.BordasArredondadas .Tabela
+{
+	width:95%;
+	height: 40%;
+	border:none;
+    border-radius:0px;
+	box-shadow: 0 0;      
+}
+

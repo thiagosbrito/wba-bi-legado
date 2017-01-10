@@ -1,0 +1,54 @@
+Aquivos contendo Template-HTML
+
+[ ] WBABI-API/checagem.jsp
+[ ] IndicadoresWBA/PainelFIDC/PainelFIDC.html
+[ ] IndicadoresWBA/Corporativo/*.*.jsp "cada arquivo é um dashboard arquivos com sequencia 
+numerica são sub links dos graficos"
+
+Arquivos CSS
+[ ] BibliotecaWBABI/*.*
+
+
+Arquivos Core , Geram API para aplicaçãp ***** não seram nescessarios porque precisa apenas apontar para o endereço de demonstração:  bi.wba.com.br:18080
+
+[ ]JSP_DASH
+
+
+Exemplo de chamada da API pentaho
+
+Logar na plataforma com os dados
+
+URL:  http://bi.wba.com.br:18080/
+Usuario : Ti
+Senha   : Desenv
+
+
+URL de chamada basica "padrão em todos as chamadas muda apenas os metodos", os metodos se encontram em JSP_DASH
+
+
+var caminhoXaction = "/pentaho/api/repos/:_WBA-FI:ControleChecagem.xaction/generatedContent?&";
+
+caminhoXaction+'getData=CarteiraTotal'
+
+
+URL final: http://bi.wba.com.br:18080/pentaho/api/repos/:_WBA-FI:ControleChecagem.xaction/generatedContent?&getData=CarteiraTotal
+  
+
+
+
+
+-----> ONDE ESTÃO OS DASHBOARD PARA EXEMPLO?
+
+Logar na plataforma
+--> Comercial
+------>Dashboards
+-------->*.*
+
+
+
+
+
+
+
+
+
